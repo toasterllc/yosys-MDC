@@ -35,7 +35,7 @@ module SB_IO (
 	reg dout, din_0, din_1;
 	reg din_q_0, din_q_1;
 	reg dout_q_0, dout_q_1;
-	reg outena_q;
+	reg outena_q = 1'b0; // DKeck: initialize registered OUTPUT_ENABLE value to 0, which reflects empirical behavior of ICE40
 
 	// IO tile generates a constant 1'b1 internally if global_cen is not connected
 	wire clken_pulled = CLOCK_ENABLE || CLOCK_ENABLE === 1'bz;
@@ -72,12 +72,12 @@ module SB_IO (
 	always @* outclk_delayed_1 <= OUTPUT_CLK;
 	always @* outclk_delayed_2 <= outclk_delayed_1;
 
-	always @* begin
+	generate
 		if (PIN_TYPE[3])
-			dout = PIN_TYPE[2] ? !dout_q_0 : D_OUT_0;
+			assign dout = PIN_TYPE[2] ? !dout_q_0 : D_OUT_0;
 		else
-			dout = (outclk_delayed_2 ^ NEG_TRIGGER) || PIN_TYPE[2] ? dout_q_0 : dout_q_1;
-	end
+			assign dout = (outclk_delayed_2 ^ NEG_TRIGGER) || PIN_TYPE[2] ? dout_q_0 : dout_q_1;
+	endgenerate
 
 	assign D_IN_0 = din_0, D_IN_1 = din_1;
 
@@ -2356,11 +2356,11 @@ endmodule
 (* blackbox *)
 module SB_PLL40_CORE (
 	input   REFERENCECLK,
-	output  PLLOUTCORE,
-	output  PLLOUTGLOBAL,
+	output reg PLLOUTCORE,
+	output reg PLLOUTGLOBAL,
 	input   EXTFEEDBACK,
 	input   [7:0] DYNAMICDELAY,
-	output  LOCK,
+	output reg LOCK,
 	input   BYPASS,
 	input   RESETB,
 	input   LATCHINPUTVALUE,
@@ -2382,6 +2382,27 @@ module SB_PLL40_CORE (
 	parameter ENABLE_ICEGATE = 1'b0;
 	parameter TEST_MODE = 1'b0;
 	parameter EXTERNAL_DIVIDE_FACTOR = 1;
+	parameter SIMFREQOUT = 16_000_000;
+	
+	function[63:0] DivCeil;
+		input[63:0] n;
+		input[63:0] d;
+		DivCeil = (n+d-1)/d;
+	endfunction
+	
+`ifndef BLACKBOX
+	initial begin
+		PLLOUTCORE = 0;
+		PLLOUTGLOBAL = 0;
+		LOCK = 1;
+		forever begin
+			#(DivCeil(1000000000000, 2*SIMFREQOUT));
+			PLLOUTCORE = !PLLOUTCORE;
+			PLLOUTGLOBAL = !PLLOUTGLOBAL;
+		end
+	end
+`endif
+
 endmodule
 
 (* blackbox *)
