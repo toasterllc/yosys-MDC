@@ -1,5 +1,5 @@
-## yosys-MDC build instructions
+## MDC Build Instructions
 
     make config-clang
-    make -j8
-    make install PREFIX=./install
+    make -j$(nproc)
+    make install PREFIX=$PWD/install
